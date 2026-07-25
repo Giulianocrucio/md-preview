@@ -1,4 +1,4 @@
-# 当前任务：文档导航、阅读工具与 v1.4.0 发布
+# 已完成任务：文档导航、阅读工具与 v1.4.0 发布
 
 ## 目标
 
@@ -25,8 +25,8 @@
 - [x] 在预览和编辑的顶部、25%、50%、底部往返切换，滚动进度误差保持在可接受范围。
 - [x] 字数统计显示非空白字符数与总字符数，中文、英文、标点、空格、换行和编辑更新均有确定结果。
 - [x] 文档缩放支持增大、减小、复位和上下限，重开应用后恢复；标签栏和工具栏尺寸不变。
-- [ ] `cargo test`、`cargo check`、`./scripts/verify.sh`、三平台 CI 与真实 macOS UI 全部通过。
-- [ ] macOS DMG 及内部 app/appex 完成 Developer ID 签名、公证、staple、Gatekeeper 与 Sparkle appcast 验证；Release 正文来自 CHANGELOG。
+- [x] `cargo test`、`cargo check`、`./scripts/verify.sh`、三平台 CI 与真实 macOS UI 全部通过。
+- [x] macOS DMG 及内部 app/appex 完成 Developer ID 签名、公证、staple、Gatekeeper 与 Sparkle appcast 验证；Release 正文来自 CHANGELOG。
 
 ## 最小验证命令
 
@@ -52,7 +52,12 @@ codesign --verify --deep --strict --verbose=2 "target/MD Preview.app"
 - 桌面脚本：锚点与本地链接 IPC、预览搜索、统计/缩放/滚动三套 Playwright 验收全部通过。
 - 真实 macOS UI：YAML 元信息、表格、代码高亮、KaTeX、Mermaid 均正确；编辑时统计由 `2,545 字 · 3,124 字符` 实时变为 `2,547 字 · 3,127 字符`；切回预览保持文档底部进度；正文放大后标签栏和工具栏尺寸不变。
 - 完整验证：`./scripts/verify.sh` 通过，覆盖 Sparkle、Windows 自更新、iOS build、Android debug/release、移动渲染与 release readiness。
-- 待发布闭环：GitHub 三平台 CI、Developer ID 签名、公证、staple、Gatekeeper、Sparkle appcast、Release 正文、issue 回复与关闭。
+- CI：独立 CI `30154652177` 与 Release workflow `30154653842` 全绿；macOS、Linux、Windows 和 publish-release 均成功。
+- Apple 公证：内层 app submission `d1f49222-23ed-4dd0-8036-bd2364f2574d`、外层 DMG submission `60561532-10bb-4d2f-87ab-7b1eb60a592a` 均为 `Accepted`，两层 staple 成功。
+- 正式资产：`v1.4.0` Release 已公开，含 Linux tar.gz、Windows exe、已签名公证的 macOS universal DMG 与 EdDSA 签名 `appcast.xml`；正文完整来自 `CHANGELOG.md`。
+- 安装验收：`/Applications/MD Preview.app` 为 `1.4.0`，签名主体为 Ningbo Huli Huli Network Technology Co., Ltd.，Team ID `BUR55497B4`；codesign、Gatekeeper、Finder extension entitlement 与 Sparkle appcast 验证通过。
+- 官网：GitHub Pages workflow `30154651918` 成功，结构化版本与 v1.4 功能文案已上线。
+- Issues：#29、#33、#38 已按原语言回复并按 completed 关闭；#19 Homebrew Cask 继续保持开放。
 
 ---
 
