@@ -22,6 +22,15 @@ pub fn is_markdown_document(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+pub fn is_primary_document(path: &Path) -> bool {
+    is_markdown_document(path)
+        || path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| extension.eq_ignore_ascii_case("txt"))
+            .unwrap_or(false)
+}
+
 pub fn is_supported_document(path: &Path) -> bool {
     looks_like_utf8_text(path).unwrap_or(false)
 }
@@ -80,11 +89,16 @@ mod tests {
         let markdown = dir.join("README.MD");
         let json = dir.join("data.json");
         let extensionless = dir.join("LICENSE");
+        let text = dir.join("notes.TXT");
         fs::write(&markdown, "# Hello").unwrap();
         fs::write(&json, r#"{"enabled": true}"#).unwrap();
         fs::write(&extensionless, "MIT License").unwrap();
+        fs::write(&text, "Notes").unwrap();
 
         assert!(is_markdown_document(&markdown));
+        assert!(is_primary_document(&markdown));
+        assert!(is_primary_document(&text));
+        assert!(!is_primary_document(&json));
         assert!(is_supported_document(&json));
         assert!(is_supported_document(&extensionless));
 

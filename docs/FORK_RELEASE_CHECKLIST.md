@@ -45,7 +45,7 @@ md-preview path/to/docs/
 Expected result:
 
 1. The requested workspace replaces any previously restored workspace, starts without an open document, and shows the explorer expanded.
-2. The explorer lists Markdown and other valid UTF-8 text files while binary files plus hidden and build directories remain filtered out.
+2. The explorer lists Markdown and other valid UTF-8 text files, gives Markdown and `.txt` entries subtle emphasis, and keeps binary files plus hidden and build directories filtered out.
 3. A single file click reuses one italic preview tab; a double-click or edit pins it.
 4. Restart restores pinned tabs and the last active pinned tab, but not the transient preview tab.
 5. `Cmd/Ctrl+B` collapses and restores the explorer; narrow windows use an overlay and print output hides all explorer chrome.

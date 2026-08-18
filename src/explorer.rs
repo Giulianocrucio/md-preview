@@ -1,4 +1,4 @@
-use crate::document::is_supported_document;
+use crate::document::{is_primary_document, is_supported_document};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -10,6 +10,7 @@ pub struct FileEntry {
     pub relative_path: String,
     pub is_dir: bool,
     pub is_supported: bool,
+    pub is_primary: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<FileEntry>>,
 }
@@ -123,6 +124,7 @@ fn scan_dir_recursive(
                     relative_path: relative,
                     is_dir: true,
                     is_supported: false,
+                    is_primary: false,
                     children: Some(children),
                 });
             }
@@ -139,6 +141,7 @@ fn scan_dir_recursive(
                 .strip_prefix(root)
                 .map(|p| p.to_string_lossy().replace('\\', "/"))
                 .unwrap_or_else(|_| file_name.clone());
+            let is_primary = is_primary_document(&path);
 
             entries.push(FileEntry {
                 name: file_name,
@@ -146,6 +149,7 @@ fn scan_dir_recursive(
                 relative_path: relative,
                 is_dir: false,
                 is_supported: true,
+                is_primary,
                 children: None,
             });
         }
@@ -285,6 +289,22 @@ mod tests {
         // Supported check
         let readme_entry = tree.entries.iter().find(|e| e.name == "README.md").unwrap();
         assert!(readme_entry.is_supported);
+        assert!(readme_entry.is_primary);
+        assert!(
+            tree.entries
+                .iter()
+                .find(|entry| entry.name == "about.txt")
+                .unwrap()
+                .is_primary
+        );
+        assert!(
+            !tree
+                .entries
+                .iter()
+                .find(|entry| entry.name == "data.json")
+                .unwrap()
+                .is_primary
+        );
 
         let docs_entry = &tree.entries[0];
         assert!(docs_entry.children.is_some());
@@ -298,6 +318,7 @@ mod tests {
         assert_eq!(src_children.len(), 1);
         assert_eq!(src_children[0].name, "main.rs");
         assert!(src_children[0].is_supported);
+        assert!(!src_children[0].is_primary);
 
         let _ = fs::remove_dir_all(dir);
     }

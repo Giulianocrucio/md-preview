@@ -1470,6 +1470,10 @@ body.has-sidebar.sidebar-collapsed .sidebar {{
   color: #444;
   line-height: 1.3;
 }}
+.tree-node.primary-document {{
+  color: #356f95;
+  font-weight: 600;
+}}
 .tree-node:hover {{
   background: rgba(0, 0, 0, 0.045);
   color: #000;
@@ -1608,6 +1612,7 @@ body.editing #btn-print {{ display: none; }}
   .sidebar-collapse-btn {{ color: #aaa; }}
   .sidebar-collapse-btn:hover {{ background: rgba(255,255,255,0.08); color: #fff; }}
   .tree-node {{ color: #bbb; }}
+  .tree-node.primary-document {{ color: #82b4d4; }}
   .tree-node:hover {{ background: rgba(255,255,255,0.06); color: #eee; }}
   .tree-node.active {{ background: #1c314a; color: #58a6ff; }}
   .tree-chevron {{ color: #aaa; }}
@@ -2138,6 +2143,7 @@ body.editing #btn-print {{ display: none; }}
       }} else {{
         var fileDiv = document.createElement('div');
         fileDiv.className = 'tree-node file';
+        if (entry.is_primary) fileDiv.classList.add('primary-document');
         fileDiv.setAttribute('data-path', entry.path);
         fileDiv.setAttribute('data-relative', entry.relative_path);
         var icon = document.createElement('span');
@@ -3076,6 +3082,8 @@ mod tests {
         assert!(page.contains(".tree-folder"));
         assert!(page.contains(".tree-chevron"));
         assert!(page.contains(".tree-node.active"));
+        assert!(page.contains(".tree-node.primary-document"));
+        assert!(page.contains("if (entry.is_primary) fileDiv.classList.add('primary-document')"));
         assert!(page.contains("body.has-sidebar:not(.sidebar-collapsed) { padding-left: 0; }"));
         assert!(page.contains("@media (max-width: 640px)"));
         assert!(page.contains("width: min(82vw, 280px)"));

@@ -104,7 +104,7 @@ On iPhone and iPad, Local Markdown Preview opens Markdown and plain-text files f
 | Feature | What it means |
 |---|---|
 | Desktop tabs | Open multiple Markdown or UTF-8 text documents in one window; duplicate paths activate the existing tab. |
-| Workspace explorer | Pass a directory to start with an empty reading area and a visible tree of renderable text files; binary, build, and hidden entries stay filtered out. |
+| Workspace explorer | Pass a directory to start with an empty reading area and a visible tree of renderable text files; Markdown and `.txt` entries receive subtle emphasis, while binary, build, and hidden entries stay filtered out. |
 | Preview tabs | Single-click files into one replaceable italic tab; double-click or edit to pin the document. |
 | Session restore | Restore tab order and the active document after restart without caching inactive document bodies. |
 | Missing files | Moved or deleted files remain as explicit missing tabs with Locate and Close actions. |
