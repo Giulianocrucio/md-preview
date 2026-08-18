@@ -19,8 +19,8 @@ AI coding tools now generate a lot of Markdown: `README.md`, `plan.md`, task spe
 
 - **Open fast** - native binary, system WebView, no bundled browser runtime.
 - **Stay local** - Markdown, syntax highlighting, math, and diagrams render on your machine.
-- **Keep documents together** - open multiple Markdown and text files in one tabbed window and resume the session later.
-- **Navigate documentation folders** - relative and absolute links to local Markdown or text files open or activate tabs instead of leaving the preview.
+- **Keep documents together** - open multiple Markdown and UTF-8 text files in one tabbed window and resume the session later.
+- **Navigate documentation folders** - relative and absolute links to local Markdown or UTF-8 text files open or activate tabs instead of leaving the preview.
 - **Edit without detours** - create Markdown from the tab bar or Finder, type immediately, and let debounced autosave persist the change.
 - **Read at your pace** - keep scroll progress between preview and source, see live character counts, and zoom only the document content.
 - **Follow external edits** - save the file in Vim, VS Code, Cursor, Zed, or anything else; the preview refreshes automatically.
@@ -85,9 +85,9 @@ md-preview path/to/docs/
 md-preview
 ```
 
-MD Preview accepts `.md` and `.txt` files through drag and drop, the open dialog, recent files, or the command line. Desktop documents open as tabs; opening the same path activates its existing tab. Use the tab-bar `+` or `Cmd/Ctrl+N` to create a Markdown file beside the current document and enter source edit immediately. Tab order and the active document are restored across launches, while inactive content stays on disk until selected. Relative images and supported local document links resolve from the current Markdown file's directory, so documentation folders render and navigate naturally.
+MD Preview accepts Markdown and UTF-8 text files—including source code, JSON, YAML, TOML, logs, and extensionless text—through drag and drop, the open dialog, recent files, or the command line. Markdown receives the full rendered preview; other text formats are escaped and displayed as preformatted source with syntax highlighting when available. Binary and invalid UTF-8 files are rejected. Desktop documents open as tabs; opening the same path activates its existing tab. Use the tab-bar `+` or `Cmd/Ctrl+N` to create a Markdown file beside the current document and enter source edit immediately. Tab order and the active document are restored across launches, while inactive content stays on disk until selected. Relative images and supported local document links resolve from the current Markdown file's directory, so documentation folders render and navigate naturally.
 
-Passing a directory opens an empty workspace with a visible, filtered Markdown/text tree instead of restoring or selecting a document automatically. A single click in the tree reuses one italic preview tab. Double-click the tree entry or the preview tab to keep that document open; editing it also pins it automatically. Transient preview tabs are not restored after restart, while the last active pinned tab is.
+Passing a directory opens an empty workspace with a visible tree of renderable UTF-8 text files instead of restoring or selecting a document automatically. Hidden files, dependency/build directories, and binary files remain filtered out. A single click in the tree reuses one italic preview tab. Double-click the tree entry or the preview tab to keep that document open; editing it also pins it automatically. Transient preview tabs are not restored after restart, while the last active pinned tab is.
 
 If a tab's file is moved or deleted, the tab remains visible instead of disappearing silently. Select it to locate the file again or close the tab.
 
@@ -103,14 +103,14 @@ On iPhone and iPad, Local Markdown Preview opens Markdown and plain-text files f
 
 | Feature | What it means |
 |---|---|
-| Desktop tabs | Open multiple Markdown or text documents in one window; duplicate paths activate the existing tab. |
-| Workspace explorer | Pass a directory to start with an empty reading area and a visible Markdown/text tree; ignored build and hidden directories stay filtered out. |
+| Desktop tabs | Open multiple Markdown or UTF-8 text documents in one window; duplicate paths activate the existing tab. |
+| Workspace explorer | Pass a directory to start with an empty reading area and a visible tree of renderable text files; binary, build, and hidden entries stay filtered out. |
 | Preview tabs | Single-click files into one replaceable italic tab; double-click or edit to pin the document. |
 | Session restore | Restore tab order and the active document after restart without caching inactive document bodies. |
 | Missing files | Moved or deleted files remain as explicit missing tabs with Locate and Close actions. |
 | Finder workflow | On macOS, create Markdown from Finder and start editing it immediately in MD Preview. |
 | Reliable autosave | Source edits save after a short pause and are flushed before preview, tab switches, tab/window close, or quit; save failures keep the tab and text intact. |
-| Local document links | Relative or absolute links to existing Markdown and text files open or activate a tab; invalid local targets do not replace the preview. |
+| Local document links | Relative or absolute links to existing Markdown and UTF-8 text files open or activate a tab; invalid or binary targets do not replace the preview. |
 | Front matter | YAML metadata at the start of a document stays readable as metadata instead of collapsing into a heading. |
 | Live statistics | The tab bar shows non-whitespace and total character counts and updates while editing. |
 | Content zoom | Zoom the rendered document or source text from 70% to 200% without resizing the tab bar or toolbar. |
@@ -162,7 +162,7 @@ MD Preview uses `pulldown-cmark` for the base Markdown pass, then enhances the r
 - Offline KaTeX math rendering with safeguards so Markdown emphasis does not break formulas
 - Offline Mermaid rendering for fenced ```` ```mermaid ```` blocks
 - Relative image paths through a per-file `<base>` URL
-- Relative and absolute links to supported local Markdown or text documents
+- Relative and absolute links to supported local Markdown or UTF-8 text documents
 - Readable YAML front matter delimited by `---` or `...`
 - Print CSS that removes app controls from printed output
 

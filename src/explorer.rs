@@ -1,3 +1,4 @@
+use crate::document::is_supported_document;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -30,18 +31,6 @@ fn normalize_path_buf(path: PathBuf) -> PathBuf {
     }
 }
 
-/// Checks if a file path has a supported Markdown or plain text document extension.
-fn is_supported_document_extension(path: &Path) -> bool {
-    path.extension()
-        .map(|extension| {
-            matches!(
-                extension.to_string_lossy().to_ascii_lowercase().as_str(),
-                "md" | "markdown" | "mdown" | "mkd" | "txt"
-            )
-        })
-        .unwrap_or(false)
-}
-
 /// Checks if a directory should be ignored during workspace traversal.
 fn is_ignored_directory(name: &str) -> bool {
     matches!(
@@ -66,7 +55,7 @@ fn is_ignored_file(name: &str) -> bool {
 }
 
 /// Recursively scans a workspace directory up to `max_depth` levels.
-/// Only Markdown and supported text documents (and folders containing them) are returned.
+/// Only renderable UTF-8 text documents (and folders containing them) are returned.
 pub fn scan_directory(root: &Path, max_depth: usize) -> WorkspaceTree {
     let canonical_root = fs::canonicalize(root)
         .map(normalize_path_buf)
@@ -126,7 +115,7 @@ fn scan_dir_recursive(
                 Vec::new()
             };
 
-            // Only include directories that contain at least one Markdown document
+            // Only include directories that contain at least one renderable text document.
             if !children.is_empty() {
                 entries.push(FileEntry {
                     name: file_name,
@@ -142,8 +131,7 @@ fn scan_dir_recursive(
                 continue;
             }
 
-            // Strictly include only supported Markdown and text documents
-            if !is_supported_document_extension(&path) {
+            if !is_supported_document(&path) {
                 continue;
             }
 
@@ -203,7 +191,7 @@ pub fn find_default_document(root: &Path) -> Option<PathBuf> {
         let mut supported_files = Vec::new();
         for item in read_dir.flatten() {
             let path = normalize_path_buf(item.path());
-            if path.is_file() && is_supported_document_extension(&path) {
+            if path.is_file() && is_supported_document(&path) {
                 supported_files.push(path);
             }
         }
@@ -272,19 +260,27 @@ mod tests {
 
         fs::write(dir.join("README.md"), "# Hello").unwrap();
         fs::write(dir.join("about.txt"), "About").unwrap();
+        fs::write(dir.join("data.json"), r#"{"ok": true}"#).unwrap();
+        fs::write(dir.join("LICENSE"), "MIT License").unwrap();
+        fs::write(dir.join("image.bin"), [0x89, b'P', b'N', b'G', 0]).unwrap();
         fs::write(docs.join("guide.md"), "# Guide").unwrap();
         fs::write(src.join("main.rs"), "fn main() {}").unwrap();
 
         let tree = scan_directory(&dir, 4);
 
-        // Only docs, about.txt, and README.md are included (src and main.rs are omitted because src has no Markdown files)
-        assert_eq!(tree.entries.len(), 3);
-        // Directories first
-        assert!(tree.entries[0].is_dir);
+        assert_eq!(tree.entries.len(), 6);
         assert_eq!(tree.entries[0].name, "docs");
-        // Files after
-        assert!(!tree.entries[1].is_dir);
-        assert!(!tree.entries[2].is_dir);
+        assert_eq!(tree.entries[1].name, "src");
+        assert!(tree.entries[0].is_dir);
+        assert!(tree.entries[1].is_dir);
+        assert_eq!(
+            tree.entries[2..]
+                .iter()
+                .map(|entry| entry.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["about.txt", "data.json", "LICENSE", "README.md"]
+        );
+        assert!(!tree.entries.iter().any(|entry| entry.name == "image.bin"));
 
         // Supported check
         let readme_entry = tree.entries.iter().find(|e| e.name == "README.md").unwrap();
@@ -296,6 +292,12 @@ mod tests {
         assert_eq!(docs_children.len(), 1);
         assert_eq!(docs_children[0].name, "guide.md");
         assert!(docs_children[0].is_supported);
+
+        let src_entry = &tree.entries[1];
+        let src_children = src_entry.children.as_ref().unwrap();
+        assert_eq!(src_children.len(), 1);
+        assert_eq!(src_children[0].name, "main.rs");
+        assert!(src_children[0].is_supported);
 
         let _ = fs::remove_dir_all(dir);
     }

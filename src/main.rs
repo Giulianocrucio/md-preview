@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+mod document;
 mod explorer;
 mod session;
 
@@ -125,7 +126,7 @@ fn is_help_arg(arg: &str) -> bool {
 
 fn print_help() {
     println!(
-        "MD Preview {}\n\nUsage:\n  md-preview [directory | file.md ...]\n\nOptions:\n  --edit        Open directly in source edit mode\n  -h, --help    Show this help message",
+        "MD Preview {}\n\nUsage:\n  md-preview [directory | text-file ...]\n\nOptions:\n  --edit        Open directly in source edit mode\n  -h, --help    Show this help message",
         env!("CARGO_PKG_VERSION")
     );
 }
@@ -430,6 +431,23 @@ fn md_to_html_with_base(md: &str, base_dir: Option<&Path>) -> String {
     }
     html::push_html(&mut html_out, events.into_iter());
     html_out
+}
+
+fn document_to_html(path: &Path, raw: &str) -> (String, EnhanceFlags) {
+    if document::is_markdown_document(path) {
+        return (
+            md_to_html_with_base(raw, path.parent()),
+            enhance_flags_for(raw),
+        );
+    }
+
+    let class = document::syntax_language(path)
+        .map(|language| format!(r#" class="language-{}""#, html_escape_attr(&language)))
+        .unwrap_or_default();
+    (
+        format!("<pre><code{class}>{}</code></pre>", html_escape_text(raw)),
+        EnhanceFlags::default(),
+    )
 }
 
 fn split_yaml_front_matter(md: &str) -> Option<(&str, &str)> {
@@ -2768,6 +2786,19 @@ mod tests {
     }
 
     #[test]
+    fn non_markdown_text_is_rendered_as_escaped_highlightable_source() {
+        let (html, flags) = document_to_html(
+            Path::new("settings.json"),
+            r#"{"markup":"<script>alert('no')</script>"}"#,
+        );
+
+        assert!(html.starts_with(r#"<pre><code class="language-json">"#));
+        assert!(html.contains("&lt;script&gt;alert('no')&lt;/script&gt;"));
+        assert!(!html.contains("<script>"));
+        assert_eq!(flags, EnhanceFlags::default());
+    }
+
+    #[test]
     fn double_equals_highlight_renders_mark_without_touching_code() {
         let html = md_to_html("Use ==highlight & tag== here and `==literal==` there.");
 
@@ -2844,12 +2875,15 @@ mod tests {
     fn file_urls_only_open_existing_supported_documents() {
         let dir = temp_test_dir("document-links");
         let linked = dir.join("含 空格.md");
-        let unsupported = dir.join("page.html");
+        let html = dir.join("page.html");
+        let binary = dir.join("image.bin");
         fs::write(&linked, "# Linked").unwrap();
-        fs::write(&unsupported, "<h1>Page</h1>").unwrap();
+        fs::write(&html, "<h1>Page</h1>").unwrap();
+        fs::write(&binary, [0x89, b'P', b'N', b'G', 0]).unwrap();
 
         let linked_url = url::Url::from_file_path(&linked).unwrap().to_string();
-        let unsupported_url = url::Url::from_file_path(&unsupported).unwrap().to_string();
+        let html_url = url::Url::from_file_path(&html).unwrap().to_string();
+        let binary_url = url::Url::from_file_path(&binary).unwrap().to_string();
         let missing_url = url::Url::from_file_path(dir.join("missing.md"))
             .unwrap()
             .to_string();
@@ -2858,7 +2892,11 @@ mod tests {
             local_document_path_from_url(&format!("{linked_url}#section")),
             Some(fs::canonicalize(&linked).unwrap())
         );
-        assert_eq!(local_document_path_from_url(&unsupported_url), None);
+        assert_eq!(
+            local_document_path_from_url(&html_url),
+            Some(fs::canonicalize(&html).unwrap())
+        );
+        assert_eq!(local_document_path_from_url(&binary_url), None);
         assert_eq!(local_document_path_from_url(&missing_url), None);
         assert_eq!(
             local_document_path_from_url("https://example.com/readme.md"),
@@ -4309,24 +4347,13 @@ fn apply_linux_webkit_compat_env() {
 #[cfg(not(target_os = "linux"))]
 fn apply_linux_webkit_compat_env() {}
 
-fn is_supported_document(path: &Path) -> bool {
-    path.extension()
-        .map(|extension| {
-            matches!(
-                extension.to_string_lossy().to_ascii_lowercase().as_str(),
-                "md" | "markdown" | "mdown" | "mkd" | "txt"
-            )
-        })
-        .unwrap_or(false)
-}
-
 fn local_document_path_from_url(value: &str) -> Option<PathBuf> {
     let url = url::Url::parse(value).ok()?;
     if url.scheme() != "file" {
         return None;
     }
     let path = url.to_file_path().ok()?;
-    if !path.is_file() || !is_supported_document(&path) {
+    if !path.is_file() || !document::is_supported_document(&path) {
         return None;
     }
     fs::canonicalize(path).ok()
@@ -4593,9 +4620,8 @@ fn render_active_document(
                 tab.missing = false;
             }
             remember_recent_file(recent_files, &active.path);
-            let html = md_to_html_with_base(&raw, active.path.parent());
+            let (html, flags) = document_to_html(&active.path, &raw);
             let base_href = base_href_for_file(&active.path).unwrap_or_default();
-            let flags = enhance_flags_for(&raw);
             *enhance_flags.lock().unwrap() = flags;
             let _ = webview.evaluate_script(&format!(
                 "if(window.__setContent)window.__setContent('{}', '{}', '{}', {}, {});",
@@ -4727,7 +4753,7 @@ fn main() {
             if workspace_from_cli.is_none() {
                 workspace_from_cli = Some(canonical);
             }
-        } else if path.exists() && is_supported_document(&path) {
+        } else if path.exists() && document::is_supported_document(&path) {
             cli_paths.push(path);
         } else {
             eprintln!("File not found or unsupported: {}", path.display());
@@ -4793,9 +4819,9 @@ fn main() {
         Some(tab) => match fs::read_to_string(&tab.path) {
             Ok(raw) => {
                 remember_recent_file(&recent_files, &tab.path);
-                let html_body = md_to_html_with_base(&raw, tab.path.parent());
+                let (html_body, flags) = document_to_html(&tab.path, &raw);
                 let base_href = base_href_for_file(&tab.path);
-                initial_flags = enhance_flags_for(&raw);
+                initial_flags = flags;
                 build_page(
                     &html_body,
                     &raw,
@@ -4920,12 +4946,12 @@ fn main() {
                 }
             } else if let Some(path_str) = body.strip_prefix("open-explorer-file:") {
                 let path = PathBuf::from(path_str);
-                if path.is_file() && is_supported_document(&path) {
+                if path.is_file() && document::is_supported_document(&path) {
                     let _ = proxy_for_ipc.send_event(UserEvent::OpenPreview(path));
                 }
             } else if let Some(path_str) = body.strip_prefix("open-explorer-pinned:") {
                 let path = PathBuf::from(path_str);
-                if path.is_file() && is_supported_document(&path) {
+                if path.is_file() && document::is_supported_document(&path) {
                     let _ = proxy_for_ipc.send_event(UserEvent::OpenPaths(vec![path], false));
                 }
             } else if let Some(rest) = body.strip_prefix("tab-action:") {
@@ -5085,7 +5111,7 @@ fn main() {
                 if let wry::DragDropEvent::Drop { paths, .. } = event {
                     let paths = paths
                         .into_iter()
-                        .filter(|path| is_supported_document(path))
+                        .filter(|path| document::is_supported_document(path))
                         .collect::<Vec<_>>();
                     if !paths.is_empty() {
                         let _ = proxy.send_event(UserEvent::OpenPaths(paths, false));
@@ -5209,14 +5235,15 @@ fn main() {
                     return;
                 }
                 if let Some(paths) = rfd::FileDialog::new()
-                    .add_filter("Markdown", &["md", "markdown", "mdown", "mkd", "txt"])
+                    .add_filter("Text documents", document::COMMON_TEXT_EXTENSIONS)
+                    .add_filter("All files", &["*"])
                     .pick_files()
                 {
                     let _ = proxy.send_event(UserEvent::OpenPaths(paths, false));
                 }
             }
             TaoEvent::UserEvent(UserEvent::OpenPreview(path)) => {
-                if !is_supported_document(&path) {
+                if !document::is_supported_document(&path) {
                     return;
                 }
                 let mut session = session_for_event.lock().unwrap();
@@ -5250,7 +5277,10 @@ fn main() {
                 let mut session = session_for_event.lock().unwrap();
                 let previous_active = session.active_id;
                 let preserve_active = session.active().map(|tab| tab.dirty).unwrap_or(false);
-                for path in paths.into_iter().filter(|path| is_supported_document(path)) {
+                for path in paths
+                    .into_iter()
+                    .filter(|path| document::is_supported_document(path))
+                {
                     session.open(path, edit_on_open);
                 }
                 if preserve_active {
@@ -5336,8 +5366,10 @@ fn main() {
             }
             TaoEvent::UserEvent(UserEvent::LocateTab(id)) => {
                 if let Some(path) = rfd::FileDialog::new()
-                    .add_filter("Markdown", &["md", "markdown", "mdown", "mkd", "txt"])
+                    .add_filter("Text documents", document::COMMON_TEXT_EXTENSIONS)
+                    .add_filter("All files", &["*"])
                     .pick_file()
+                    .filter(|path| document::is_supported_document(path))
                 {
                     let mut session = session_for_event.lock().unwrap();
                     if session.relocate(id, path) && session.activate(id) {
@@ -5421,8 +5453,7 @@ fn main() {
                 APP_DIRTY.store(false, Ordering::SeqCst);
                 if active_matches {
                     if let Ok(raw) = fs::read_to_string(&path) {
-                        let html = md_to_html_with_base(&raw, path.parent());
-                        let flags = enhance_flags_for(&raw);
+                        let (html, flags) = document_to_html(&path, &raw);
                         *enhance_flags.lock().unwrap() = flags;
                         let _ = webview.evaluate_script(&format!(
                             "if(window.__setPreview)window.__setPreview('{}', {}, {});if(window.__markSaved)window.__markSaved('{}');",
@@ -5560,7 +5591,7 @@ fn main() {
                 let mut paths = Vec::new();
                 for url in urls {
                     if let Ok(path) = url.to_file_path() {
-                        if is_supported_document(&path) {
+                        if document::is_supported_document(&path) {
                             paths.push(path);
                         }
                         continue;

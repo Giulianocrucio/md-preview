@@ -45,7 +45,7 @@ md-preview path/to/docs/
 Expected result:
 
 1. The requested workspace replaces any previously restored workspace, starts without an open document, and shows the explorer expanded.
-2. The explorer lists supported Markdown/text files while hidden and build directories remain filtered out.
+2. The explorer lists Markdown and other valid UTF-8 text files while binary files plus hidden and build directories remain filtered out.
 3. A single file click reuses one italic preview tab; a double-click or edit pins it.
 4. Restart restores pinned tabs and the last active pinned tab, but not the transient preview tab.
 5. `Cmd/Ctrl+B` collapses and restores the explorer; narrow windows use an overlay and print output hides all explorer chrome.
@@ -63,7 +63,7 @@ Failure examples:
 
 This release turns MD Preview into a faster documentation workspace while keeping its local-first, lightweight design.
 
-- Open a directory to get an expanded Markdown/text explorer with no document selected yet.
+- Open a directory to get an expanded Markdown and UTF-8 text explorer with no document selected yet.
 - Single-click files into one reusable preview tab, then double-click or edit to keep the document open.
 - Preserve expanded folders while switching files, and restore pinned tabs with the correct active document after restart.
 - Keep the explorer responsive in narrow windows and out of printed output.
