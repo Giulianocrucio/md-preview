@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+mod explorer;
 mod session;
 
 use notify::{Event, RecursiveMode, Watcher};
@@ -38,7 +39,9 @@ enum UserEvent {
     NewFile,
     OpenFile,
     OpenPaths(Vec<PathBuf>, bool),
+    OpenPreview(PathBuf),
     ActivateTab(u64),
+    PinTab(u64),
     CloseTab(u64),
     CloseActiveTab,
     LocateTab(u64),
@@ -122,7 +125,7 @@ fn is_help_arg(arg: &str) -> bool {
 
 fn print_help() {
     println!(
-        "MD Preview {}\n\nUsage:\n  md-preview [file.md]\n\nOptions:\n  -h, --help    Show this help message",
+        "MD Preview {}\n\nUsage:\n  md-preview [directory | file.md ...]\n\nOptions:\n  --edit        Open directly in source edit mode\n  -h, --help    Show this help message",
         env!("CARGO_PKG_VERSION")
     );
 }
@@ -166,6 +169,9 @@ struct Strings {
     btn_zoom_out: &'static str,
     btn_zoom_reset: &'static str,
     btn_zoom_in: &'static str,
+    btn_sidebar: &'static str,
+    sidebar_title: &'static str,
+    preview_tab_hint: &'static str,
     search_placeholder: &'static str,
     stat_words: &'static str,
     stat_chars: &'static str,
@@ -195,6 +201,9 @@ impl Strings {
                 btn_zoom_out: "缩小正文 (Cmd/Ctrl+-)",
                 btn_zoom_reset: "重置正文缩放 (Cmd/Ctrl+0)",
                 btn_zoom_in: "放大正文 (Cmd/Ctrl++)",
+                btn_sidebar: "文件浏览器 (Cmd/Ctrl+B)",
+                sidebar_title: "资源管理器",
+                preview_tab_hint: "预览标签页 — 双击以保持打开",
                 search_placeholder: "搜索",
                 stat_words: "字",
                 stat_chars: "字符",
@@ -220,6 +229,9 @@ impl Strings {
                 btn_zoom_out: "Zoom out (Cmd/Ctrl+-)",
                 btn_zoom_reset: "Reset zoom (Cmd/Ctrl+0)",
                 btn_zoom_in: "Zoom in (Cmd/Ctrl++)",
+                btn_sidebar: "Explorer (Cmd/Ctrl+B)",
+                sidebar_title: "Explorer",
+                preview_tab_hint: "Preview tab — double-click to keep open",
                 search_placeholder: "Find",
                 stat_words: "non-space",
                 stat_chars: "chars",
@@ -793,6 +805,7 @@ fn tabs_json(session: &DocumentSession) -> String {
                 "active": session.active_id == Some(tab.id),
                 "missing": tab.missing,
                 "dirty": tab.dirty,
+                "preview": tab.preview,
             })
         })
         .collect::<Vec<_>>();
@@ -1223,6 +1236,7 @@ body.has-tabs {{ --chrome-top: 50px; }}
 	.tab.dirty .tab-status {{ background: #2979c9; }}
 	.tab.missing .tab-status {{ width: auto; height: auto; background: none; border-radius: 0; font-weight: 700; }}
 	.tab-name {{ min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+	.tab.preview .tab-name {{ font-style: italic; }}
 	.tab-close {{
 	  width: 20px; height: 20px; flex: 0 0 auto; padding: 0; border: 0; border-radius: 5px;
 	  display: grid; place-items: center; color: inherit; background: transparent; cursor: pointer;
@@ -1309,59 +1323,168 @@ body.empty .toolbar.has-update button:not(.update-btn) {{ display: none !importa
 	  display: grid; place-items: center; color: #555; background: transparent; cursor: pointer;
 	}}
 	.findbar button:hover {{ background: #f0f0f0; color: #111; }}
-	@media (prefers-color-scheme: dark) {{
-	  body {{ color: #d4d4d4; background: #1e1e1e; }}
-	  #preview a {{ color: #6cb6ff; }}
-	  #preview h1, #preview h2 {{ border-color: #333; }}
-	  #preview .front-matter {{ border-color: #333; color: #a9b1ba; }}
-	  #preview .front-matter pre {{ background: transparent !important; }}
-	  #preview pre {{ background: #2d2d2d !important; }}
-	  #preview code:not(pre code) {{ background: #2d2d2d; }}
-	  #preview blockquote {{ border-color: #444; color: #aaa; }}
-	  #preview .markdown-alert-note,
-	  #preview .markdown-alert-tip,
-	  #preview .markdown-alert-important,
-	  #preview .markdown-alert-warning,
-	  #preview .markdown-alert-caution {{ background: #161b22; color: #d4d4d4; }}
-	  #preview .markdown-alert-note {{ border-color: #2f81f7; }}
-	  #preview .markdown-alert-tip {{ border-color: #3fb950; }}
-	  #preview .markdown-alert-important {{ border-color: #a371f7; }}
-	  #preview .markdown-alert-warning {{ border-color: #d29922; }}
-	  #preview .markdown-alert-caution {{ border-color: #f85149; }}
-	  #preview .markdown-alert-note .markdown-alert-title {{ color: #2f81f7; }}
-	  #preview .markdown-alert-tip .markdown-alert-title {{ color: #3fb950; }}
-	  #preview .markdown-alert-important .markdown-alert-title {{ color: #a371f7; }}
-	  #preview .markdown-alert-warning .markdown-alert-title {{ color: #d29922; }}
-	  #preview .markdown-alert-caution .markdown-alert-title {{ color: #f85149; }}
-	  #preview table th {{ background: #2d2d2d; color: #f0f0f0; }}
-	  #preview table td, #preview table th {{ border-color: #444; }}
-	  #preview hr {{ border-color: #333; }}
-	  .toolbar button {{
-	    background: rgba(40,40,40,0.8);
-    border-color: rgba(255,255,255,0.1);
-    color: #bbb;
-	  }}
-	  .toolbar button:hover {{ color: #fff; background: rgba(55,55,55,1); }}
-	  .zoom-popover {{ background: rgba(34,34,34,.96); border-color: rgba(255,255,255,.12); }}
-	  .toolbar .zoom-popover button:hover {{ background: rgba(255,255,255,.1); }}
-	  .toolbar .update-btn {{ color: #6cb6ff; }}
-		  .empty-open {{ background: #242424; border-color: #444; color: #ddd; }}
-		  .empty-open:hover {{ background: #2d2d2d; color: #fff; }}
-		  .recent-name {{ color: #ddd; }}
-		  .recent-item {{ background: #242424; border-color: #333; }}
-		  .recent-item:hover {{ background: #2d2d2d; }}
-	  .findbar {{ background: rgba(34,34,34,0.96); border-color: rgba(255,255,255,0.1); }}
-	  .findbar button:hover {{ background: #333; color: #fff; }}
-	  .tabbar {{ background: rgba(28,28,28,.96); border-color: #363636; }}
-	  .tab {{ color: #aaa; }}
-	  .tab:hover {{ background: rgba(255,255,255,.07); }}
-	  .tab.active {{ color: #eee; background: #2c2c2c; border-color: #444; }}
-	  .tab.missing {{ color: #e3a04b; }}
-	  .tab-close:hover, .tab-open:hover {{ background: rgba(255,255,255,.1); color: #fff; }}
-	  .missing-file p {{ color: #aaa; }}
-	  .missing-actions button {{ background: #292929; border-color: #444; color: #ddd; }}
-	  .missing-actions button:hover {{ background: #333; }}
-	}}
+
+/* Sidebar Toggle Button (Floating top-left when sidebar is collapsed) */
+#btn-sidebar {{
+  display: none;
+  position: fixed;
+  top: var(--chrome-top);
+  left: 10px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  place-items: center;
+  cursor: pointer;
+  color: #555;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, color 0.15s, background 0.15s;
+}}
+html:hover #btn-sidebar {{
+  opacity: 1;
+  pointer-events: auto;
+}}
+body.has-sidebar.sidebar-collapsed #btn-sidebar {{
+  display: grid;
+}}
+body.has-sidebar:not(.sidebar-collapsed) #btn-sidebar {{
+  display: none !important;
+}}
+#btn-sidebar:hover {{
+  color: #000;
+  background: rgba(255, 255, 255, 1);
+}}
+
+/* Sidebar Explorer Base Styles (Light) */
+.sidebar {{
+  display: none;
+  position: fixed;
+  top: var(--chrome-top);
+  left: 0;
+  bottom: 0;
+  width: 240px;
+  box-sizing: border-box;
+  border-right: 1px solid #e6e6e6;
+  background: rgba(250, 250, 250, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 102;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-size: 13px;
+  user-select: none;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}}
+body.has-sidebar .sidebar {{
+  display: flex;
+  flex-direction: column;
+}}
+body.has-sidebar:not(.sidebar-collapsed) {{
+  padding-left: 240px;
+}}
+body.has-sidebar.sidebar-collapsed .sidebar {{
+  transform: translateX(-100%);
+  pointer-events: none;
+  opacity: 0;
+}}
+.sidebar-header {{
+  height: 34px;
+  min-height: 34px;
+  padding: 0 10px 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  border-bottom: 1px solid #eee;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+}}
+.sidebar-title {{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}}
+.sidebar-collapse-btn {{
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #777;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}}
+.sidebar-collapse-btn:hover {{
+  background: rgba(0, 0, 0, 0.06);
+  color: #111;
+}}
+.tree-view {{
+  flex: 1;
+  padding: 6px 4px 20px;
+  overflow-y: auto;
+}}
+.tree-node {{
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #444;
+  line-height: 1.3;
+}}
+.tree-node:hover {{
+  background: rgba(0, 0, 0, 0.045);
+  color: #000;
+}}
+.tree-node.active {{
+  background: #e6f0fa;
+  color: #0969da;
+  font-weight: 600;
+}}
+.tree-chevron {{
+  font-size: 9px;
+  width: 12px;
+  text-align: center;
+  color: #888;
+  transition: transform 0.15s ease;
+  display: inline-block;
+}}
+.tree-folder.open > .tree-node > .tree-chevron {{
+  transform: rotate(90deg);
+}}
+.tree-folder > .tree-children {{
+  display: none;
+  padding-left: 12px;
+}}
+.tree-folder.open > .tree-children {{
+  display: block;
+}}
+.tree-icon {{
+  font-size: 13px;
+  line-height: 1;
+  display: inline-block;
+  opacity: 0.85;
+}}
+.tree-label {{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}}
 
 /* Source editor textarea — height is auto-grown by JS to match content,
    so the page (html) owns the only vertical scrollbar. */
@@ -1378,6 +1501,7 @@ body.empty .toolbar.has-update button:not(.update-btn) {{ display: none !importa
 body.editing #preview {{ display: none; }}
 body.editing #editor {{ display: block; padding: 16px 24px; }}
 body.editing #app {{ max-width: none; padding: 0; }}
+body.editing #btn-sidebar,
 body.editing #btn-open,
 body.editing #btn-search,
 body.editing #btn-print {{ display: none; }}
@@ -1386,14 +1510,102 @@ body.editing #btn-print {{ display: none; }}
   margin: 12mm;
 }}
 
+@media (max-width: 640px) {{
+  body.has-sidebar:not(.sidebar-collapsed) {{ padding-left: 0; }}
+  .sidebar {{
+    width: min(82vw, 280px);
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.16);
+  }}
+}}
+
+@media (prefers-color-scheme: dark) {{
+  body {{ color: #d4d4d4; background: #1e1e1e; }}
+  #preview a {{ color: #6cb6ff; }}
+  #preview h1, #preview h2 {{ border-color: #333; }}
+  #preview .front-matter {{ border-color: #333; color: #a9b1ba; }}
+  #preview .front-matter pre {{ background: transparent !important; }}
+  #preview pre {{ background: #2d2d2d !important; }}
+  #preview code:not(pre code) {{ background: #2d2d2d; }}
+  #preview blockquote {{ border-color: #444; color: #aaa; }}
+  #preview .markdown-alert-note,
+  #preview .markdown-alert-tip,
+  #preview .markdown-alert-important,
+  #preview .markdown-alert-warning,
+  #preview .markdown-alert-caution {{ background: #161b22; color: #d4d4d4; }}
+  #preview .markdown-alert-note {{ border-color: #2f81f7; }}
+  #preview .markdown-alert-tip {{ border-color: #3fb950; }}
+  #preview .markdown-alert-important {{ border-color: #a371f7; }}
+  #preview .markdown-alert-warning {{ border-color: #d29922; }}
+  #preview .markdown-alert-caution {{ border-color: #f85149; }}
+  #preview .markdown-alert-note .markdown-alert-title {{ color: #2f81f7; }}
+  #preview .markdown-alert-tip .markdown-alert-title {{ color: #3fb950; }}
+  #preview .markdown-alert-important .markdown-alert-title {{ color: #a371f7; }}
+  #preview .markdown-alert-warning .markdown-alert-title {{ color: #d29922; }}
+  #preview .markdown-alert-caution .markdown-alert-title {{ color: #f85149; }}
+  #preview table th {{ background: #2d2d2d; color: #f0f0f0; }}
+  #preview table td, #preview table th {{ border-color: #444; }}
+  #preview hr {{ border-color: #333; }}
+  #btn-sidebar {{
+    background: rgba(40,40,40,0.8);
+    border-color: rgba(255,255,255,0.1);
+    color: #bbb;
+  }}
+  #btn-sidebar:hover {{
+    color: #fff;
+    background: rgba(55,55,55,1);
+  }}
+  .toolbar button {{
+    background: rgba(40,40,40,0.8);
+    border-color: rgba(255,255,255,0.1);
+    color: #bbb;
+  }}
+  .toolbar button:hover {{ color: #fff; background: rgba(55,55,55,1); }}
+  .zoom-popover {{ background: rgba(34,34,34,.96); border-color: rgba(255,255,255,.12); }}
+  .toolbar .zoom-popover button:hover {{ background: rgba(255,255,255,.1); }}
+  .toolbar .update-btn {{ color: #6cb6ff; }}
+  .empty-open {{ background: #242424; border-color: #444; color: #ddd; }}
+  .empty-open:hover {{ background: #2d2d2d; color: #fff; }}
+  .recent-name {{ color: #ddd; }}
+  .recent-item {{ background: #242424; border-color: #333; }}
+  .recent-item:hover {{ background: #2d2d2d; }}
+  .findbar {{ background: rgba(34,34,34,0.96); border-color: rgba(255,255,255,0.1); }}
+  .findbar button:hover {{ background: #333; color: #fff; }}
+  .tabbar {{ background: rgba(28,28,28,.96); border-color: #363636; }}
+  .tab {{ color: #aaa; }}
+  .tab:hover {{ background: rgba(255,255,255,.07); }}
+  .tab.active {{ color: #eee; background: #2c2c2c; border-color: #444; }}
+  .tab.missing {{ color: #e3a04b; }}
+  .tab-close:hover, .tab-open:hover {{ background: rgba(255,255,255,.1); color: #fff; }}
+  .missing-file p {{ color: #aaa; }}
+  .missing-actions button {{ background: #292929; border-color: #444; color: #ddd; }}
+  .missing-actions button:hover {{ background: #333; }}
+  .sidebar {{ background: rgba(24,24,24,0.96); border-color: #333; color: #bbb; }}
+  .sidebar-header {{ border-color: #2e2e2e; color: #777; }}
+  .sidebar-collapse-btn {{ color: #aaa; }}
+  .sidebar-collapse-btn:hover {{ background: rgba(255,255,255,0.08); color: #fff; }}
+  .tree-node {{ color: #bbb; }}
+  .tree-node:hover {{ background: rgba(255,255,255,0.06); color: #eee; }}
+  .tree-node.active {{ background: #1c314a; color: #58a6ff; }}
+  .tree-chevron {{ color: #aaa; }}
+}}
+
 @media print {{
-  .toolbar, .tabbar, #editor {{ display: none !important; }}
+  body.has-sidebar:not(.sidebar-collapsed) {{ padding-left: 0; }}
+  .toolbar, .tabbar, #editor, .sidebar, #btn-sidebar {{ display: none !important; }}
   #preview {{ display: block !important; }}
   #app {{ max-width: none; padding: 0; }}
   #preview .mdp-table-wrap {{ width: auto; margin: 1em 0; transform: none; overflow: visible; }}
 }}
 	</style></head><body class="{body_class}">
 	<div class="tabbar" id="tabbar"><div class="tabs" id="tabs"></div><div class="doc-stats" id="doc-stats" aria-live="polite"></div><button class="tab-open" id="tab-open" type="button" title="{btn_new}" aria-label="{btn_new}">+</button></div>
+	<button id="btn-sidebar" title="{btn_sidebar}" aria-label="{btn_sidebar}"></button>
+	<aside class="sidebar" id="sidebar">
+	  <div class="sidebar-header">
+	    <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" type="button" title="{btn_sidebar}" aria-label="{btn_sidebar}">◀</button>
+	    <span class="sidebar-title" id="sidebar-title">{sidebar_title}</span>
+	  </div>
+	  <div class="tree-view" id="tree-view"></div>
+	</aside>
 	<div class="toolbar">
 	  <button id="btn-open" title="{btn_open}" aria-label="{btn_open}"></button>
 	  <button id="btn-search" title="{btn_search}" aria-label="{btn_search}"></button>
@@ -1431,8 +1643,22 @@ body.editing #btn-print {{ display: none; }}
 	  var ICON_UP = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>';
 	  var ICON_DOWN = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
 	  var ICON_CLOSE = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
-	  var L_EDIT = '{btn_edit}', L_VIEW = '{btn_preview}';
+	  var ICON_SIDEBAR = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>';
+	  var L_EDIT = '{btn_edit}', L_VIEW = '{btn_preview}', L_PREVIEW_TAB = '{preview_tab_hint_js}';
 
+	  var btnSidebar = document.getElementById('btn-sidebar');
+	  var sidebarEl = document.getElementById('sidebar');
+	  var sidebarTitleEl = document.getElementById('sidebar-title');
+	  var treeViewEl = document.getElementById('tree-view');
+	  var sidebarCollapseBtn = document.getElementById('sidebar-collapse-btn');
+	  var currentWorkspaceTree = null;
+	  var currentActiveExplorerPath = '';
+	  var expandedExplorerPaths = new Set();
+	  var lastExplorerFileClickPath = '';
+	  var lastExplorerFileClickAt = 0;
+	  var lastTabClickId = '';
+	  var lastTabClickAt = 0;
+	  var PREVIEW_PIN_DOUBLE_CLICK_MS = 500;
 	  var btnOpen = document.getElementById('btn-open');
 	  var btnSearch = document.getElementById('btn-search');
 	  var btnToggle = document.getElementById('btn-toggle');
@@ -1471,6 +1697,7 @@ body.editing #btn-print {{ display: none; }}
 	  var ZOOM_STEP = 10;
 	  var zoomPercent = 100;
 
+	  if (btnSidebar) btnSidebar.innerHTML = ICON_SIDEBAR;
 	  btnOpen.innerHTML = ICON_OPEN;
 	  btnSearch.innerHTML = ICON_SEARCH;
 	  btnToggle.innerHTML = ICON_EDIT;
@@ -1756,11 +1983,24 @@ body.editing #btn-print {{ display: none; }}
 	  btnOpen.addEventListener('click', openFile);
 	  tabOpen.addEventListener('click', newFile);
 	  btnSearch.addEventListener('click', showFind);
+	  document.addEventListener('pointerdown', function(e) {{
+	    var target = e.target && e.target.closest ? e.target : null;
+	    if (!target || !target.closest('[data-tab-id]')) {{
+	      lastTabClickId = '';
+	      lastTabClickAt = 0;
+	    }}
+	    if (!target || !target.closest('.tree-node.file')) {{
+	      lastExplorerFileClickPath = '';
+	      lastExplorerFileClickAt = 0;
+	    }}
+	  }}, true);
 	  document.addEventListener('click', function(e) {{
 	    var closeTab = e.target && e.target.closest ? e.target.closest('[data-close-tab]') : null;
 	    if (closeTab) {{
 	      e.preventDefault();
 	      e.stopPropagation();
+	      lastTabClickId = '';
+	      lastTabClickAt = 0;
 	      requestTabAction('close', closeTab.getAttribute('data-close-tab'));
 	      return;
 	    }}
@@ -1773,7 +2013,17 @@ body.editing #btn-print {{ display: none; }}
 	    var tab = e.target && e.target.closest ? e.target.closest('[data-tab-id]') : null;
 	    if (tab) {{
 	      e.preventDefault();
-	      requestTabAction('activate', tab.getAttribute('data-tab-id'));
+	      var tabId = tab.getAttribute('data-tab-id');
+	      var tabClickAt = Date.now();
+	      if (lastTabClickId === tabId && tabClickAt - lastTabClickAt <= PREVIEW_PIN_DOUBLE_CLICK_MS) {{
+	        lastTabClickId = '';
+	        lastTabClickAt = 0;
+	        requestTabAction('pin', tabId);
+	      }} else {{
+	        lastTabClickId = tabId;
+	        lastTabClickAt = tabClickAt;
+	        requestTabAction('activate', tabId);
+	      }}
 	      return;
 	    }}
 	    var openBtn = e.target && e.target.closest ? e.target.closest('[data-open-file]') : null;
@@ -1803,6 +2053,162 @@ body.editing #btn-print {{ display: none; }}
 	  findNext.addEventListener('click', function() {{ runFind(false); }});
 	  findClose.addEventListener('click', hideFind);
 
+	  if (btnSidebar) {{
+	    btnSidebar.addEventListener('click', function() {{ toggleSidebar(); }});
+	  }}
+	  if (sidebarCollapseBtn) {{
+	    sidebarCollapseBtn.addEventListener('click', function() {{ toggleSidebar(false); }});
+	  }}
+
+  function toggleSidebar(forceState) {{
+    if (!document.body.classList.contains('has-sidebar')) return;
+    var willCollapse = typeof forceState === 'boolean' ? !forceState : !document.body.classList.contains('sidebar-collapsed');
+    document.body.classList.toggle('sidebar-collapsed', willCollapse);
+    try {{ localStorage.setItem('md-preview-sidebar-collapsed', willCollapse ? '1' : '0'); }} catch (_) {{}}
+  }}
+  window.__mdPreviewToggleSidebar = toggleSidebar;
+
+  function loadSidebarState() {{
+    try {{
+      if (localStorage.getItem('md-preview-sidebar-collapsed') === '1') {{
+        document.body.classList.add('sidebar-collapsed');
+      }}
+    }} catch (_) {{}}
+  }}
+
+  function normalizeExplorerPath(path) {{
+    return String(path || '').replace(/\\/g, '/');
+  }}
+
+  function renderTreeNodes(entries, container) {{
+    if (!Array.isArray(entries)) return;
+    entries.forEach(function(entry) {{
+      if (entry.is_dir) {{
+        var folderDiv = document.createElement('div');
+        folderDiv.className = 'tree-folder';
+        var folderPath = normalizeExplorerPath(entry.path);
+        if (expandedExplorerPaths.has(folderPath)) folderDiv.classList.add('open');
+        var nodeDiv = document.createElement('div');
+        nodeDiv.className = 'tree-node folder';
+        nodeDiv.setAttribute('data-path', entry.path);
+        var chevron = document.createElement('span');
+        chevron.className = 'tree-chevron';
+        chevron.textContent = '▶';
+        var icon = document.createElement('span');
+        icon.className = 'tree-icon';
+        icon.textContent = '📁';
+        var label = document.createElement('span');
+        label.className = 'tree-label';
+        label.textContent = entry.name;
+        nodeDiv.appendChild(chevron);
+        nodeDiv.appendChild(icon);
+        nodeDiv.appendChild(label);
+
+        var childrenDiv = document.createElement('div');
+        childrenDiv.className = 'tree-children';
+        if (entry.children) {{
+          renderTreeNodes(entry.children, childrenDiv);
+        }}
+
+        nodeDiv.addEventListener('click', function(e) {{
+          e.stopPropagation();
+          var isOpen = folderDiv.classList.toggle('open');
+          if (isOpen) expandedExplorerPaths.add(folderPath);
+          else expandedExplorerPaths.delete(folderPath);
+        }});
+
+        folderDiv.appendChild(nodeDiv);
+        folderDiv.appendChild(childrenDiv);
+        container.appendChild(folderDiv);
+      }} else {{
+        var fileDiv = document.createElement('div');
+        fileDiv.className = 'tree-node file';
+        fileDiv.setAttribute('data-path', entry.path);
+        fileDiv.setAttribute('data-relative', entry.relative_path);
+        var icon = document.createElement('span');
+        icon.className = 'tree-icon';
+        icon.textContent = '📄';
+        var label = document.createElement('span');
+        label.className = 'tree-label';
+        label.textContent = entry.name;
+        fileDiv.appendChild(icon);
+        fileDiv.appendChild(label);
+
+        fileDiv.addEventListener('click', function(e) {{
+          e.stopPropagation();
+          var filePath = normalizeExplorerPath(entry.path);
+          var fileClickAt = Date.now();
+          if (lastExplorerFileClickPath === filePath && fileClickAt - lastExplorerFileClickAt <= PREVIEW_PIN_DOUBLE_CLICK_MS) {{
+            lastExplorerFileClickPath = '';
+            lastExplorerFileClickAt = 0;
+            window.ipc.postMessage('open-explorer-pinned:' + entry.path);
+          }} else {{
+            lastExplorerFileClickPath = filePath;
+            lastExplorerFileClickAt = fileClickAt;
+            window.ipc.postMessage('open-explorer-file:' + entry.path);
+          }}
+        }});
+        container.appendChild(fileDiv);
+      }}
+    }});
+  }}
+
+  function applyActiveExplorerPath(expandAncestors) {{
+    if (!treeViewEl) return;
+    var prev = treeViewEl.querySelectorAll('.tree-node.active');
+    prev.forEach(function(el) {{ el.classList.remove('active'); }});
+    var normalized = normalizeExplorerPath(currentActiveExplorerPath);
+    if (!normalized) return;
+
+    var nodes = treeViewEl.querySelectorAll('.tree-node.file');
+    for (var i = 0; i < nodes.length; i++) {{
+      var nodePath = normalizeExplorerPath(nodes[i].getAttribute('data-path'));
+      if (nodePath === normalized) {{
+        nodes[i].classList.add('active');
+        if (expandAncestors) {{
+          var parent = nodes[i].parentElement;
+          while (parent && parent !== treeViewEl) {{
+            if (parent.classList.contains('tree-folder')) {{
+              parent.classList.add('open');
+              var folderNode = parent.firstElementChild;
+              if (folderNode) {{
+                expandedExplorerPaths.add(normalizeExplorerPath(folderNode.getAttribute('data-path')));
+              }}
+            }}
+            parent = parent.parentElement;
+          }}
+        }}
+        break;
+      }}
+    }}
+  }}
+
+  window.__setExplorerTree = function(tree) {{
+    if (typeof tree === 'string') {{
+      try {{ tree = JSON.parse(tree); }} catch (_) {{ return; }}
+    }}
+    if (!tree || !tree.root_name) return;
+    if (currentWorkspaceTree && normalizeExplorerPath(currentWorkspaceTree.root_path) !== normalizeExplorerPath(tree.root_path)) {{
+      expandedExplorerPaths.clear();
+    }}
+    currentWorkspaceTree = tree;
+    document.body.classList.add('has-sidebar');
+    if (sidebarTitleEl) sidebarTitleEl.textContent = tree.root_name;
+    if (treeViewEl) {{
+      treeViewEl.textContent = '';
+      renderTreeNodes(tree.entries, treeViewEl);
+    }}
+    applyActiveExplorerPath(false);
+  }};
+
+  window.__setActiveExplorerPath = function(path) {{
+    var activeChanged = normalizeExplorerPath(path) !== normalizeExplorerPath(currentActiveExplorerPath);
+    currentActiveExplorerPath = path || '';
+    applyActiveExplorerPath(activeChanged);
+  }};
+
+  loadSidebarState();
+
 	  btnToggle.addEventListener('click', function() {{
 	    window.__mdPreviewToggleEdit();
 	  }});
@@ -1826,6 +2232,11 @@ body.editing #btn-print {{ display: none; }}
   }});
 
   document.addEventListener('keydown', function(e) {{
+	if ((e.metaKey || e.ctrlKey) && (e.key === 'b' || e.key === 'B')) {{
+	  e.preventDefault();
+	  toggleSidebar();
+	  return;
+	}}
 	if ((e.metaKey || e.ctrlKey) && (e.key === 'w' || e.key === 'W')) {{
 	  if (activeTabId) {{
 	    e.preventDefault();
@@ -1933,11 +2344,12 @@ body.editing #btn-print {{ display: none; }}
 	  document.body.classList.toggle('has-tabs', tabs.length > 0);
 	  tabs.forEach(function(tab) {{
 	    var item = document.createElement('div');
-	    item.className = 'tab' + (tab.active ? ' active' : '') + (tab.missing ? ' missing' : '') + (tab.dirty ? ' dirty' : '');
+	    item.className = 'tab' + (tab.active ? ' active' : '') + (tab.missing ? ' missing' : '') + (tab.dirty ? ' dirty' : '') + (tab.preview ? ' preview' : '');
 	    item.setAttribute('data-tab-id', tab.id);
 	    item.setAttribute('role', 'button');
 	    item.setAttribute('tabindex', '0');
-	    item.title = tab.path;
+	    item.title = tab.path + (tab.preview ? '\n' + L_PREVIEW_TAB : '');
+	    item.setAttribute('aria-label', tab.name + (tab.preview ? ', ' + L_PREVIEW_TAB : ''));
 	    if (tab.active) activeTabId = tab.id;
 	    var status = document.createElement('span');
 	    status.className = 'tab-status';
@@ -2058,6 +2470,9 @@ window.__mdPreviewInstallUpdateCheck({{
         btn_zoom_out = s.btn_zoom_out,
         btn_zoom_reset = s.btn_zoom_reset,
         btn_zoom_in = s.btn_zoom_in,
+        btn_sidebar = s.btn_sidebar,
+        sidebar_title = s.sidebar_title,
+        preview_tab_hint_js = escape_js(s.preview_tab_hint),
         search_placeholder = s.search_placeholder,
         btn_update_js = escape_js(s.btn_update),
         stat_words_js = escape_js(s.stat_words),
@@ -2593,6 +3008,100 @@ mod tests {
         assert!(page.contains("id=\"btn-zoom-in\""));
         assert!(page.contains("id=\"btn-zoom-out\""));
         assert!(page.contains("id=\"btn-zoom-reset\""));
+    }
+
+    #[test]
+    fn page_includes_sidebar_and_explorer_contracts() {
+        let strings = Strings::for_lang(Lang::En);
+        let page = build_page(
+            &md_to_html("# Hello"),
+            "# Hello",
+            None,
+            EnhanceFlags::default(),
+            &strings,
+            false,
+            true,
+        );
+
+        assert!(page.contains("id=\"sidebar\""));
+        assert!(page.contains("id=\"btn-sidebar\""));
+        assert!(page.contains("id=\"tree-view\""));
+        assert!(page.contains("window.__setExplorerTree"));
+        assert!(page.contains("window.__setActiveExplorerPath"));
+        assert!(page.contains("window.__mdPreviewToggleSidebar"));
+        assert!(page.contains("open-explorer-file:"));
+        assert!(page.contains("(e.key === 'b' || e.key === 'B')"));
+        assert!(page.contains(".sidebar"));
+        assert!(page.contains(".sidebar-header"));
+        assert!(page.contains(".sidebar-collapse-btn"));
+        assert!(page.contains("body.has-sidebar"));
+        assert!(page.contains(".tree-folder"));
+        assert!(page.contains(".tree-chevron"));
+        assert!(page.contains(".tree-node.active"));
+        assert!(page.contains("body.has-sidebar:not(.sidebar-collapsed) { padding-left: 0; }"));
+        assert!(page.contains("@media (max-width: 640px)"));
+        assert!(page.contains("width: min(82vw, 280px)"));
+        assert!(page.contains("var expandedExplorerPaths = new Set()"));
+        assert!(page.contains("if (isOpen) expandedExplorerPaths.add(folderPath)"));
+        assert!(page.contains("else expandedExplorerPaths.delete(folderPath)"));
+        assert!(page.contains("applyActiveExplorerPath(false)"));
+        assert!(page.contains("applyActiveExplorerPath(activeChanged)"));
+    }
+
+    #[test]
+    fn explorer_active_path_is_cleared_when_no_tab_is_active() {
+        let session = DocumentSession::default();
+
+        assert_eq!(
+            explorer_active_path_script(&session),
+            "if(window.__setActiveExplorerPath)window.__setActiveExplorerPath('');"
+        );
+    }
+
+    #[test]
+    fn explicit_workspace_opens_its_default_document_over_a_restored_tab() {
+        let old_workspace = temp_test_dir("old-workspace");
+        let new_workspace = temp_test_dir("new-workspace");
+        let old_document = old_workspace.join("old.md");
+        let new_readme = new_workspace.join("README.md");
+        fs::write(&old_document, "# Old").unwrap();
+        fs::write(&new_readme, "# New workspace").unwrap();
+
+        let mut session = DocumentSession::default();
+        session.open(old_document, false);
+        apply_startup_paths(&mut session, Some(new_workspace.clone()), Vec::new(), false);
+
+        assert_eq!(session.workspace_root, Some(new_workspace.clone()));
+        assert_eq!(
+            session.active().map(|tab| &tab.path),
+            Some(&fs::canonicalize(&new_readme).unwrap())
+        );
+        assert_eq!(session.tabs.len(), 2);
+        let _ = fs::remove_dir_all(old_workspace);
+        let _ = fs::remove_dir_all(new_workspace);
+    }
+
+    #[test]
+    fn tab_state_and_page_expose_preview_pinning_contract() {
+        let mut session = DocumentSession::default();
+        session.open_preview(PathBuf::from("preview.md"));
+        let state = serde_json::from_str::<serde_json::Value>(&tabs_json(&session)).unwrap();
+        assert_eq!(state[0]["preview"], true);
+
+        let strings = Strings::for_lang(Lang::En);
+        let page = build_page(
+            &md_to_html("# Preview"),
+            "# Preview",
+            None,
+            EnhanceFlags::default(),
+            &strings,
+            false,
+            true,
+        );
+        assert!(page.contains(".tab.preview .tab-name"));
+        assert!(page.contains("tab.preview ? ' preview' : ''"));
+        assert!(page.contains("open-explorer-pinned:"));
+        assert!(page.contains("requestTabAction('pin'"));
     }
 
     #[test]
@@ -3995,6 +4504,30 @@ fn update_tabs(webview: &WebView, session: &DocumentSession) {
     let _ = webview.evaluate_script(&format!("if(window.__setTabs)window.__setTabs({state});"));
 }
 
+fn update_explorer(webview: &WebView, session: &DocumentSession) {
+    if let Some(ref root) = session.workspace_root {
+        let tree = explorer::scan_directory(root, 4);
+        if let Ok(json_str) = serde_json::to_string(&tree) {
+            let _ = webview.evaluate_script(&format!(
+                "if(window.__setExplorerTree)window.__setExplorerTree({});",
+                json_str
+            ));
+        }
+    }
+    let _ = webview.evaluate_script(&explorer_active_path_script(session));
+}
+
+fn explorer_active_path_script(session: &DocumentSession) -> String {
+    let path = session
+        .active()
+        .map(|active| active.path.to_string_lossy())
+        .unwrap_or_default();
+    format!(
+        "if(window.__setActiveExplorerPath)window.__setActiveExplorerPath('{}');",
+        escape_js(&path)
+    )
+}
+
 fn update_window_title(window: &Window, session: &DocumentSession) {
     let title = session
         .active()
@@ -4027,6 +4560,7 @@ fn render_active_document(
             escape_js(&html)
         ));
         update_tabs(webview, session);
+        update_explorer(webview, session);
         update_window_title(window, session);
         return;
     };
@@ -4090,7 +4624,37 @@ fn render_active_document(
         Ordering::SeqCst,
     );
     update_tabs(webview, session);
+    update_explorer(webview, session);
     update_window_title(window, session);
+}
+
+fn apply_startup_paths(
+    session: &mut DocumentSession,
+    workspace_from_cli: Option<PathBuf>,
+    cli_paths: Vec<PathBuf>,
+    edit_on_open: bool,
+) {
+    let workspace_was_explicit = workspace_from_cli.is_some();
+    if let Some(workspace) = workspace_from_cli {
+        session.workspace_root = Some(workspace);
+    }
+
+    if !cli_paths.is_empty() {
+        for path in cli_paths {
+            session.open(path, edit_on_open);
+        }
+        return;
+    }
+
+    if workspace_was_explicit || session.tabs.is_empty() {
+        if let Some(default_file) = session
+            .workspace_root
+            .as_deref()
+            .and_then(explorer::find_default_document)
+        {
+            session.open(default_file, edit_on_open);
+        }
+    }
 }
 
 fn main() {
@@ -4108,14 +4672,14 @@ fn main() {
     };
     bench_log("main_start");
 
-    // CLI: md-preview [--edit] [file.md ...]
+    // CLI: md-preview [--edit] [directory | file.md ...]
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     if args.iter().any(|arg| is_help_arg(arg)) {
         print_help();
         return;
     }
     let edit_from_cli = args.iter().any(|arg| arg == "--edit");
-    let cli_paths = args
+    let raw_paths = args
         .into_iter()
         .filter(|arg| arg != "--edit")
         .map(PathBuf::from)
@@ -4126,15 +4690,23 @@ fn main() {
                 path
             }
         })
-        .filter(|path| {
-            if path.exists() && is_supported_document(path) {
-                true
-            } else {
-                eprintln!("File not found or unsupported: {}", path.display());
-                false
-            }
-        })
         .collect::<Vec<_>>();
+
+    let mut cli_paths = Vec::new();
+    let mut workspace_from_cli: Option<PathBuf> = None;
+
+    for path in raw_paths {
+        if path.is_dir() {
+            let canonical = fs::canonicalize(&path).unwrap_or(path);
+            if workspace_from_cli.is_none() {
+                workspace_from_cli = Some(canonical);
+            }
+        } else if path.exists() && is_supported_document(&path) {
+            cli_paths.push(path);
+        } else {
+            eprintln!("File not found or unsupported: {}", path.display());
+        }
+    }
 
     let lang = detect_lang();
     let strings = Strings::for_lang(lang);
@@ -4143,9 +4715,12 @@ fn main() {
     bench_log("after_register");
 
     let mut initial_session = DocumentSession::load(&session_path());
-    for path in cli_paths {
-        initial_session.open(path, edit_from_cli);
-    }
+    apply_startup_paths(
+        &mut initial_session,
+        workspace_from_cli,
+        cli_paths,
+        edit_from_cli,
+    );
 
     let event_loop: EventLoop<UserEvent> = EventLoopBuilder::with_user_event().build();
     let proxy = event_loop.create_proxy();
@@ -4312,6 +4887,16 @@ fn main() {
                 if let Some(path) = local_document_path_from_url(url) {
                     let _ = proxy_for_ipc.send_event(UserEvent::OpenPaths(vec![path], false));
                 }
+            } else if let Some(path_str) = body.strip_prefix("open-explorer-file:") {
+                let path = PathBuf::from(path_str);
+                if path.is_file() && is_supported_document(&path) {
+                    let _ = proxy_for_ipc.send_event(UserEvent::OpenPreview(path));
+                }
+            } else if let Some(path_str) = body.strip_prefix("open-explorer-pinned:") {
+                let path = PathBuf::from(path_str);
+                if path.is_file() && is_supported_document(&path) {
+                    let _ = proxy_for_ipc.send_event(UserEvent::OpenPaths(vec![path], false));
+                }
             } else if let Some(rest) = body.strip_prefix("tab-action:") {
                 let (header, pending_content) = rest
                     .split_once('\n')
@@ -4353,6 +4938,9 @@ fn main() {
                 match action {
                     "activate" => {
                         let _ = proxy_for_ipc.send_event(UserEvent::ActivateTab(id));
+                    }
+                    "pin" => {
+                        let _ = proxy_for_ipc.send_event(UserEvent::PinTab(id));
                     }
                     "close" => {
                         let _ = proxy_for_ipc.send_event(UserEvent::CloseTab(id));
@@ -4491,6 +5079,7 @@ fn main() {
     bench_log("webview_built");
     let session_for_event = Arc::clone(&document_session);
     update_tabs(&webview, &session_for_event.lock().unwrap());
+    update_explorer(&webview, &session_for_event.lock().unwrap());
     if session_for_event
         .lock()
         .unwrap()
@@ -4595,6 +5184,37 @@ fn main() {
                     let _ = proxy.send_event(UserEvent::OpenPaths(paths, false));
                 }
             }
+            TaoEvent::UserEvent(UserEvent::OpenPreview(path)) => {
+                if !is_supported_document(&path) {
+                    return;
+                }
+                let mut session = session_for_event.lock().unwrap();
+                let previous_active = session.active_id;
+                let preserve_active = session.active().map(|tab| tab.dirty).unwrap_or(false);
+                session.open_preview(path);
+                if preserve_active {
+                    if let Some(id) = previous_active {
+                        session.activate(id);
+                    }
+                }
+                persist_session(&session);
+                if preserve_active {
+                    update_tabs(&webview, &session);
+                } else {
+                    render_active_document(
+                        &webview,
+                        &window,
+                        &mut session,
+                        &recent_files,
+                        &enhance_flags,
+                        &mut loaded_enhancers,
+                        &strings,
+                    );
+                }
+                let path = session.active().map(|tab| tab.path.clone());
+                drop(session);
+                install_file_watcher(&watcher_for_event, &proxy, &last_self_write, path);
+            }
             TaoEvent::UserEvent(UserEvent::OpenPaths(paths, edit_on_open)) => {
                 let mut session = session_for_event.lock().unwrap();
                 let previous_active = session.active_id;
@@ -4641,6 +5261,13 @@ fn main() {
                     let path = session.active().map(|tab| tab.path.clone());
                     drop(session);
                     install_file_watcher(&watcher_for_event, &proxy, &last_self_write, path);
+                }
+            }
+            TaoEvent::UserEvent(UserEvent::PinTab(id)) => {
+                let mut session = session_for_event.lock().unwrap();
+                if session.pin(id) {
+                    persist_session(&session);
+                    update_tabs(&webview, &session);
                 }
             }
             TaoEvent::UserEvent(UserEvent::CloseTab(id)) => {
@@ -4723,9 +5350,8 @@ fn main() {
                 if session.active().map(|tab| tab.path.as_path()) == Some(path.as_path()) {
                     let session_dirty = session.active().map(|tab| tab.dirty).unwrap_or(false);
                     if should_protect_external_change(webview_dirty, session_dirty) {
-                        if let Some(tab) = session.active_mut() {
-                            tab.dirty = true;
-                        }
+                        session.set_active_dirty(true);
+                        persist_session(&session);
                         APP_DIRTY.store(true, Ordering::SeqCst);
                         let _ = webview.evaluate_script(
                             "if(window.__mdPreviewPauseAutosave)window.__mdPreviewPauseAutosave();",
@@ -4796,8 +5422,8 @@ fn main() {
             TaoEvent::UserEvent(UserEvent::DirtyChanged(dirty)) => {
                 APP_DIRTY.store(dirty, Ordering::SeqCst);
                 let mut session = session_for_event.lock().unwrap();
-                if let Some(tab) = session.active_mut() {
-                    tab.dirty = dirty;
+                if session.set_active_dirty(dirty) {
+                    persist_session(&session);
                 }
                 update_tabs(&webview, &session);
                 update_window_title(&window, &session);

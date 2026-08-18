@@ -97,6 +97,10 @@ for marker in ("new-file", "AUTOSAVE_DEBOUNCE_MS = 700", "window.__mdPreviewReso
     if marker not in src:
         raise SystemExit(f"desktop New Markdown/autosave contract is missing: {marker}")
 PY
+  if [ -f scripts/verify-explorer-contract.py ]; then
+    echo "[agent-verify] explorer contract"
+    python3 scripts/verify-explorer-contract.py
+  fi
   ran=1
 fi
 
