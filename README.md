@@ -78,7 +78,7 @@ The iOS and Android source projects remain available under `mobile/`, but this f
 # Open one or several files directly
 md-preview README.md plan.md task.md
 
-# Open a documentation folder with the workspace explorer
+# Open an empty documentation workspace with the explorer visible
 md-preview path/to/docs/
 
 # Or launch an empty window, use Open File, pick a recent file, or drag one in
@@ -87,7 +87,7 @@ md-preview
 
 MD Preview accepts `.md` and `.txt` files through drag and drop, the open dialog, recent files, or the command line. Desktop documents open as tabs; opening the same path activates its existing tab. Use the tab-bar `+` or `Cmd/Ctrl+N` to create a Markdown file beside the current document and enter source edit immediately. Tab order and the active document are restored across launches, while inactive content stays on disk until selected. Relative images and supported local document links resolve from the current Markdown file's directory, so documentation folders render and navigate naturally.
 
-Passing a directory opens its preferred document (`README.md`, then `index.md`, then the first supported file) and shows a filtered Markdown/text tree. A single click in the tree reuses one italic preview tab. Double-click the tree entry or the preview tab to keep that document open; editing it also pins it automatically. Transient preview tabs are not restored after restart, while the last active pinned tab is.
+Passing a directory opens an empty workspace with a visible, filtered Markdown/text tree instead of restoring or selecting a document automatically. A single click in the tree reuses one italic preview tab. Double-click the tree entry or the preview tab to keep that document open; editing it also pins it automatically. Transient preview tabs are not restored after restart, while the last active pinned tab is.
 
 If a tab's file is moved or deleted, the tab remains visible instead of disappearing silently. Select it to locate the file again or close the tab.
 
@@ -104,7 +104,7 @@ On iPhone and iPad, Local Markdown Preview opens Markdown and plain-text files f
 | Feature | What it means |
 |---|---|
 | Desktop tabs | Open multiple Markdown or text documents in one window; duplicate paths activate the existing tab. |
-| Workspace explorer | Pass a directory to browse its Markdown/text tree; ignored build and hidden directories stay out of the reading view. |
+| Workspace explorer | Pass a directory to start with an empty reading area and a visible Markdown/text tree; ignored build and hidden directories stay filtered out. |
 | Preview tabs | Single-click files into one replaceable italic tab; double-click or edit to pin the document. |
 | Session restore | Restore tab order and the active document after restart without caching inactive document bodies. |
 | Missing files | Moved or deleted files remain as explicit missing tabs with Locate and Close actions. |

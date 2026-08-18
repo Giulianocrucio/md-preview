@@ -44,7 +44,7 @@ md-preview path/to/docs/
 
 Expected result:
 
-1. The requested workspace replaces any previously restored workspace and its preferred document becomes active.
+1. The requested workspace replaces any previously restored workspace, starts without an open document, and shows the explorer expanded.
 2. The explorer lists supported Markdown/text files while hidden and build directories remain filtered out.
 3. A single file click reuses one italic preview tab; a double-click or edit pins it.
 4. Restart restores pinned tabs and the last active pinned tab, but not the transient preview tab.
@@ -52,7 +52,7 @@ Expected result:
 
 Failure examples:
 
-- An old workspace document remains active after launching a different directory.
+- An old or automatically selected document is active after launching a directory.
 - Repeated single clicks create an unlimited number of tabs.
 - Restart restores a transient preview or selects an unrelated pinned tab.
 - A forked build checks, downloads, or installs releases from `vorojar/md-preview`.
@@ -63,7 +63,7 @@ Failure examples:
 
 This release turns MD Preview into a faster documentation workspace while keeping its local-first, lightweight design.
 
-- Open a directory to get a focused Markdown/text explorer and an automatically selected README or index document.
+- Open a directory to get an expanded Markdown/text explorer with no document selected yet.
 - Single-click files into one reusable preview tab, then double-click or edit to keep the document open.
 - Preserve expanded folders while switching files, and restore pinned tabs with the correct active document after restart.
 - Keep the explorer responsive in narrow windows and out of printed output.

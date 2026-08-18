@@ -83,6 +83,13 @@ impl DocumentSession {
         id
     }
 
+    pub fn reset_for_workspace(&mut self, root: PathBuf) {
+        *self = Self {
+            workspace_root: Some(normalize_path(root)),
+            ..Self::default()
+        };
+    }
+
     pub fn open_preview(&mut self, path: PathBuf) -> u64 {
         if let Some(active) = self.active().filter(|tab| !tab.preview) {
             self.last_pinned_active_id = Some(active.id);

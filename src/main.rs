@@ -1073,12 +1073,14 @@ fn build_page(
     flags: EnhanceFlags,
     s: &Strings,
     empty: bool,
+    sidebar_expanded: bool,
     native_updater: bool,
 ) -> String {
-    let body_class = if empty {
-        "empty sidebar-collapsed"
-    } else {
-        "sidebar-collapsed"
+    let body_class = match (empty, sidebar_expanded) {
+        (true, true) => "empty",
+        (true, false) => "empty sidebar-collapsed",
+        (false, true) => "",
+        (false, false) => "sidebar-collapsed",
     };
     let base_tag = base_href
         .map(|href| format!(r#"<base id="base-href" href="{}">"#, html_escape_attr(href)))
@@ -2920,6 +2922,7 @@ mod tests {
             EnhanceFlags::default(),
             &strings,
             false,
+            false,
             true,
         );
 
@@ -2982,6 +2985,7 @@ mod tests {
             EnhanceFlags::default(),
             &strings,
             false,
+            false,
             true,
         );
 
@@ -3012,6 +3016,7 @@ mod tests {
             None,
             EnhanceFlags::default(),
             &strings,
+            false,
             false,
             true,
         );
@@ -3054,26 +3059,43 @@ mod tests {
     }
 
     #[test]
-    fn explicit_workspace_opens_its_default_document_over_a_restored_tab() {
+    fn explicit_workspace_starts_empty_instead_of_restoring_or_opening_a_document() {
         let old_workspace = temp_test_dir("old-workspace");
         let new_workspace = temp_test_dir("new-workspace");
         let old_document = old_workspace.join("old.md");
-        let new_readme = new_workspace.join("README.md");
         fs::write(&old_document, "# Old").unwrap();
-        fs::write(&new_readme, "# New workspace").unwrap();
+        fs::write(new_workspace.join("README.md"), "# New workspace").unwrap();
 
         let mut session = DocumentSession::default();
         session.open(old_document, false);
         apply_startup_paths(&mut session, Some(new_workspace.clone()), Vec::new(), false);
 
-        assert_eq!(session.workspace_root, Some(new_workspace.clone()));
         assert_eq!(
-            session.active().map(|tab| &tab.path),
-            Some(&fs::canonicalize(&new_readme).unwrap())
+            session.workspace_root,
+            Some(fs::canonicalize(&new_workspace).unwrap())
         );
-        assert_eq!(session.tabs.len(), 2);
+        assert!(session.active().is_none());
+        assert!(session.tabs.is_empty());
         let _ = fs::remove_dir_all(old_workspace);
         let _ = fs::remove_dir_all(new_workspace);
+    }
+
+    #[test]
+    fn explicit_workspace_page_starts_with_sidebar_expanded() {
+        let strings = Strings::for_lang(Lang::En);
+        let page = build_page(
+            &empty_preview_html(&strings, &[]),
+            "",
+            None,
+            EnhanceFlags::default(),
+            &strings,
+            true,
+            true,
+            false,
+        );
+
+        assert!(page.contains("<body class=\"empty\">"));
+        assert!(!page.contains("<body class=\"empty sidebar-collapsed\">"));
     }
 
     #[test]
@@ -3090,6 +3112,7 @@ mod tests {
             None,
             EnhanceFlags::default(),
             &strings,
+            false,
             false,
             true,
         );
@@ -3108,6 +3131,7 @@ mod tests {
             None,
             EnhanceFlags::default(),
             &strings,
+            false,
             false,
             true,
         );
@@ -3144,6 +3168,7 @@ mod tests {
             None,
             EnhanceFlags::default(),
             &strings,
+            false,
             false,
             false,
         );
@@ -3215,6 +3240,7 @@ mod tests {
             EnhanceFlags::default(),
             &strings,
             true,
+            false,
             false,
         );
         assert!(page.contains("<body class=\"empty sidebar-collapsed\">"));
@@ -4632,7 +4658,7 @@ fn apply_startup_paths(
 ) {
     let workspace_was_explicit = workspace_from_cli.is_some();
     if let Some(workspace) = workspace_from_cli {
-        session.workspace_root = Some(workspace);
+        session.reset_for_workspace(workspace);
     }
 
     if !cli_paths.is_empty() {
@@ -4642,7 +4668,11 @@ fn apply_startup_paths(
         return;
     }
 
-    if workspace_was_explicit || session.tabs.is_empty() {
+    if workspace_was_explicit {
+        return;
+    }
+
+    if session.workspace_root.is_some() && session.tabs.is_empty() {
         if let Some(default_file) = session
             .workspace_root
             .as_deref()
@@ -4711,6 +4741,7 @@ fn main() {
     bench_log("after_register");
 
     let mut initial_session = DocumentSession::load(&session_path());
+    let sidebar_expanded = workspace_from_cli.is_some();
     apply_startup_paths(
         &mut initial_session,
         workspace_from_cli,
@@ -4772,6 +4803,7 @@ fn main() {
                     initial_flags,
                     &strings,
                     false,
+                    sidebar_expanded,
                     native_updater_enabled,
                 )
             }
@@ -4786,6 +4818,7 @@ fn main() {
                     EnhanceFlags::default(),
                     &strings,
                     false,
+                    sidebar_expanded,
                     native_updater_enabled,
                 )
             }
@@ -4801,6 +4834,7 @@ fn main() {
                 EnhanceFlags::default(),
                 &strings,
                 true,
+                sidebar_expanded,
                 native_updater_enabled,
             ),
         },
@@ -4811,6 +4845,7 @@ fn main() {
             EnhanceFlags::default(),
             &strings,
             true,
+            sidebar_expanded,
             native_updater_enabled,
         ),
     };
