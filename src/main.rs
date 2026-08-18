@@ -1075,7 +1075,11 @@ fn build_page(
     empty: bool,
     native_updater: bool,
 ) -> String {
-    let body_class = if empty { "empty" } else { "" };
+    let body_class = if empty {
+        "empty sidebar-collapsed"
+    } else {
+        "sidebar-collapsed"
+    };
     let base_tag = base_href
         .map(|href| format!(r#"<base id="base-href" href="{}">"#, html_escape_attr(href)))
         .unwrap_or_else(|| r#"<base id="base-href">"#.to_string());
@@ -2064,17 +2068,8 @@ body.editing #btn-print {{ display: none; }}
     if (!document.body.classList.contains('has-sidebar')) return;
     var willCollapse = typeof forceState === 'boolean' ? !forceState : !document.body.classList.contains('sidebar-collapsed');
     document.body.classList.toggle('sidebar-collapsed', willCollapse);
-    try {{ localStorage.setItem('md-preview-sidebar-collapsed', willCollapse ? '1' : '0'); }} catch (_) {{}}
   }}
   window.__mdPreviewToggleSidebar = toggleSidebar;
-
-  function loadSidebarState() {{
-    try {{
-      if (localStorage.getItem('md-preview-sidebar-collapsed') === '1') {{
-        document.body.classList.add('sidebar-collapsed');
-      }}
-    }} catch (_) {{}}
-  }}
 
   function normalizeExplorerPath(path) {{
     return String(path || '').replace(/\\/g, '/');
@@ -2206,8 +2201,6 @@ body.editing #btn-print {{ display: none; }}
     currentActiveExplorerPath = path || '';
     applyActiveExplorerPath(activeChanged);
   }};
-
-  loadSidebarState();
 
 	  btnToggle.addEventListener('click', function() {{
 	    window.__mdPreviewToggleEdit();
@@ -3025,6 +3018,8 @@ mod tests {
 
         assert!(page.contains("id=\"sidebar\""));
         assert!(page.contains("id=\"btn-sidebar\""));
+        assert!(page.contains("<body class=\"sidebar-collapsed\">"));
+        assert!(!page.contains("md-preview-sidebar-collapsed"));
         assert!(page.contains("id=\"tree-view\""));
         assert!(page.contains("window.__setExplorerTree"));
         assert!(page.contains("window.__setActiveExplorerPath"));
@@ -3222,6 +3217,7 @@ mod tests {
             true,
             false,
         );
+        assert!(page.contains("<body class=\"empty sidebar-collapsed\">"));
         assert!(page.contains(".empty.has-recent"));
         assert!(!page.contains(".empty.has-recent .recent { max-height"));
     }
