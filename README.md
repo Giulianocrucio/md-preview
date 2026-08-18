@@ -1,19 +1,17 @@
 # MD Preview
 
-[![GitHub stars](https://img.shields.io/github/stars/vorojar/md-preview)](https://github.com/vorojar/md-preview/stargazers)
-[![Release](https://img.shields.io/github/v/release/vorojar/md-preview)](https://github.com/vorojar/md-preview/releases)
+[![GitHub stars](https://img.shields.io/github/stars/Giulianocrucio/md-preview)](https://github.com/Giulianocrucio/md-preview/stargazers)
+[![Release](https://img.shields.io/github/v/release/Giulianocrucio/md-preview)](https://github.com/Giulianocrucio/md-preview/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-lightgrey)](https://github.com/vorojar/md-preview/releases)
-[![App Store](https://img.shields.io/badge/App%20Store-Local%20Markdown%20Preview-blue?logo=appstore)](https://apps.apple.com/cn/app/local-markdown-preview/id6779451523)
-[![Binary size](https://img.shields.io/badge/binary-~5MB-green)](https://github.com/vorojar/md-preview/releases)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-lightgrey)](https://github.com/Giulianocrucio/md-preview)
 
 > Multiple Markdown files, one lightweight window. Follow local document links, inspect counts, zoom the page, and edit with automatic save—without launching a whole IDE.
 
 MD Preview is a fast, local-first Markdown previewer and quick editor built with **Rust** and the system **WebView** on desktop, plus native iOS and Android shells for opening Markdown from Files, WeChat, WeCom, and system share sheets. It does not bundle Chromium, does not require Electron, and keeps all rendering assets offline. Open several local documents as tabs, return to the same active document after restart, or create a Markdown file from Finder on macOS and start typing immediately.
 
-> **Fork status:** this development branch is based on [vorojar/md-preview](https://github.com/vorojar/md-preview) and adds a desktop workspace explorer plus replaceable preview tabs. The upstream MIT license and copyright notice are retained. Until a fork owner completes the [fork release checklist](docs/FORK_RELEASE_CHECKLIST.md), the badges, downloads, update service, signing identity, website, and mobile store links intentionally continue to identify the upstream project.
+> **Fork status:** this repository is based on [vorojar/md-preview](https://github.com/vorojar/md-preview) and adds a desktop workspace explorer plus replaceable preview tabs. Source, issue, clone, and future release links in this README refer to [Giulianocrucio/md-preview](https://github.com/Giulianocrucio/md-preview). The upstream MIT license and copyright notice are retained. The embedded updater and signing identities still belong to upstream, so complete the [fork release checklist](docs/FORK_RELEASE_CHECKLIST.md) before distributing fork-owned binaries.
 
-![MD Preview screenshot](https://vorojar.github.io/md-preview/hero.jpg)
+![MD Preview screenshot](docs/hero.jpg)
 
 ## Why It Exists
 
@@ -40,36 +38,39 @@ Use it as a small preview-first workspace for the documents your tools generate:
 - On macOS, create a new Markdown document from Finder and land directly in source edit instead of opening VS Code first.
 - Print or export the rendered preview when you need a clean PDF.
 
-## Download
+## Installation
 
-Get the latest build from [GitHub Releases](https://github.com/vorojar/md-preview/releases).
+The source of this fork is published at [Giulianocrucio/md-preview](https://github.com/Giulianocrucio/md-preview). Fork-owned binaries will appear on its [Releases page](https://github.com/Giulianocrucio/md-preview/releases) after the release identity, signing, and updater configuration in the [fork release checklist](docs/FORK_RELEASE_CHECKLIST.md) is complete.
 
-| Platform | Package | Notes |
-|---|---|---|
-| macOS | `MD-Preview-macOS-universal.dmg` | Universal app for Apple Silicon and Intel. Releases are signed and notarized. |
-| Windows | `MD-Preview-windows-x64.exe` | Single-file app. The in-app updater downloads the next exe, verifies its SHA-256 digest, replaces itself, and relaunches. |
-| Linux | `MD-Preview-linux-x64.tar.gz` | Requires the system WebKitGTK runtime. |
-| iOS / iPadOS | [Local Markdown Preview on the App Store](https://apps.apple.com/cn/app/local-markdown-preview/id6779451523) | Native iPhone and iPad viewer for opening Markdown from Files and the iOS share sheet. |
-| Android | `MD-Preview-Android.apk` | Native Android viewer for opening Markdown files from Files, WeChat, WeCom, and share sheets. |
+Report problems or request fork-specific features through this repository's [GitHub Issues](https://github.com/Giulianocrucio/md-preview/issues).
 
-Android builds are published as separate mobile releases, for example [mobile-android-v1.0.7](https://github.com/vorojar/md-preview/releases/tag/mobile-android-v1.0.7). The iOS build is now available on the App Store as [Local Markdown Preview](https://apps.apple.com/cn/app/local-markdown-preview/id6779451523).
+For now, build and run the fork from source:
 
-You can also build from source:
+```powershell
+git clone https://github.com/Giulianocrucio/md-preview.git
+cd md-preview
+cargo build --release
+.\target\release\md-preview.exe README.md
+```
+
+On macOS or Linux, use the same repository with Unix-style executable paths:
 
 ```bash
-git clone https://github.com/vorojar/md-preview.git
+git clone https://github.com/Giulianocrucio/md-preview.git
 cd md-preview
 cargo build --release
 ./target/release/md-preview README.md
 ```
 
-To create the macOS `.app` bundle locally:
+To create a macOS `.app` bundle locally after building:
 
 ```bash
 chmod +x bundle.sh
 ./bundle.sh
 cp -r "target/MD Preview.app" /Applications/
 ```
+
+The iOS and Android source projects remain available under `mobile/`, but this fork does not currently advertise a fork-owned App Store listing or signed Android package.
 
 ## Usage
 
@@ -92,7 +93,7 @@ If a tab's file is moved or deleted, the tab remains visible instead of disappea
 
 ### macOS Finder actions
 
-The notarized macOS app includes a Finder extension. After dragging `MD Preview.app` to Applications, open it once. If macOS does not enable the extension automatically, use **System Settings → General → Login Items & Extensions → Finder Extensions**.
+A macOS app bundle created by this project includes a Finder extension. After dragging `MD Preview.app` to Applications, open it once. If macOS does not enable the extension automatically, use **System Settings → General → Login Items & Extensions → Finder Extensions**. Independent signing and notarization must be configured before this fork distributes a public macOS binary.
 
 Right-click inside a Finder folder to create Markdown, text, JSON, or HTML files, copy the folder path, or open the folder in Terminal. **New Markdown** creates a non-conflicting filename and opens it directly in MD Preview's source editor.
 
@@ -131,7 +132,7 @@ On iPhone and iPad, Local Markdown Preview opens Markdown and plain-text files f
 | GitHub-flavored Markdown | Tables, task lists, strikethrough, heading attributes, and anchors. |
 | External links | `http`, `https`, and `mailto` links open in the system browser or mail app. |
 | Window restore | Last size and position are restored when still visible on a connected monitor. |
-| Updates | After first paint, MD Preview checks desktop GitHub Releases. macOS uses Sparkle for signed in-app updates; Windows self-updates the single exe after SHA-256 verification; Linux opens the matching release download. |
+| Updates | The inherited desktop updater currently checks upstream releases. Reconfigure its repository URLs and signing identity before distributing binaries from this fork. |
 
 ## Keyboard Shortcuts
 
@@ -224,15 +225,15 @@ cargo test
 cargo build --release
 ```
 
-CI builds macOS, Windows, and Linux. Release tags matching `v*` produce a macOS DMG, standalone Windows EXE, and Linux tarball through GitHub Actions.
+CI builds macOS, Windows, and Linux. The workflows are included in this fork, but release tags must not be used for public binaries until the repository URLs, signing identities, and secrets in the [fork release checklist](docs/FORK_RELEASE_CHECKLIST.md) are configured for `Giulianocrucio/md-preview`.
 
-Maintainer release flow:
+After that migration is complete, the maintainer release flow is:
 
 ```bash
 scripts/release.sh v1.2.3
 ```
 
-The script runs verification, pushes `master` and the tag, waits for GitHub Actions, signs/notarizes/staples the macOS DMG in the foreground, uploads `appcast.xml`, and verifies the final Release assets.
+The script runs verification, pushes `master` and the tag, waits for GitHub Actions, signs/notarizes/staples the macOS DMG in the foreground, uploads `appcast.xml`, and verifies the final release assets. Review its repository target before running it.
 
 ## License
 
